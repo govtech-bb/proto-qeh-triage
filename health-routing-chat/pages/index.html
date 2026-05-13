@@ -1,0 +1,313 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Are you unwell? — GovBB</title>
+  <link rel="icon" href="https://cdn.jsdelivr.net/npm/@govtech-bb/styles@1.0.0-alpha.16/dist/assets/images/favicon.ico">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@govtech-bb/styles@1.0.0-alpha.16/dist/styles.css">
+  <script defer src="../assets/facilities.js"></script>
+  <script defer src="../assets/chat.js"></script>
+  <style>
+    .chat-shell {
+      display: flex;
+      flex-direction: column;
+      height: calc(100vh - 280px);
+      min-height: 520px;
+      max-width: 52rem;
+      margin: 0 auto;
+      border: 2px solid var(--color-grey-00);
+      border-radius: 8px;
+      overflow: hidden;
+      background: var(--color-white-00);
+    }
+    .chat-header {
+      background: var(--color-blue-100);
+      color: var(--color-white-00);
+      padding: var(--spacing-m) var(--spacing-m);
+    }
+    .chat-header h1 {
+      font-size: 1.875rem;
+      line-height: 1.2;
+      margin: 0;
+      color: inherit;
+      font-weight: 700;
+    }
+    .chat-header p {
+      font-size: 1.125rem;
+      line-height: 1.4;
+      margin: 6px 0 0;
+      opacity: 1;
+    }
+    .chat-stream {
+      flex: 1;
+      overflow-y: auto;
+      padding: var(--spacing-s);
+      display: flex;
+      flex-direction: column;
+      gap: var(--spacing-xs);
+      background: var(--color-blue-10);
+    }
+    .bubble {
+      padding: 12px 16px;
+      border-radius: 14px;
+      max-width: 85%;
+      line-height: 1.45;
+      font-size: 1rem;
+    }
+    .bubble--bot {
+      background: var(--color-white-00);
+      align-self: flex-start;
+      border-bottom-left-radius: 4px;
+    }
+    .bubble--user {
+      background: var(--color-teal-00);
+      color: var(--color-white-00);
+      align-self: flex-end;
+      border-bottom-right-radius: 4px;
+    }
+    .bubble--system {
+      background: var(--color-yellow-40);
+      align-self: center;
+      font-size: 0.875rem;
+      max-width: 100%;
+      text-align: center;
+    }
+    .chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 4px;
+    }
+    .chip {
+      background: var(--color-white-00);
+      border: 2px solid var(--color-teal-00);
+      color: var(--color-teal-00);
+      padding: 8px 14px;
+      border-radius: 999px;
+      font-size: 0.9375rem;
+      font-weight: 600;
+      cursor: pointer;
+      font-family: inherit;
+    }
+    .chip:hover { background: var(--color-teal-10); }
+    .chip:focus-visible { outline: 3px solid var(--color-yellow-100); outline-offset: 2px; }
+    .chip--danger {
+      border-color: var(--color-red-00);
+      color: var(--color-red-00);
+    }
+    .chip--danger:hover { background: var(--color-red-10); }
+    .composer {
+      display: flex;
+      gap: 8px;
+      padding: var(--spacing-xs);
+      border-top: 2px solid var(--color-grey-00);
+      background: var(--color-white-00);
+      align-items: stretch;
+    }
+    .composer input[type="text"] {
+      flex: 1;
+      padding: 12px;
+      font-size: 1rem;
+      border: 2px solid var(--color-text);
+      border-radius: 6px;
+      font-family: inherit;
+    }
+    .composer input[type="text"]:focus-visible {
+      outline: 3px solid var(--color-teal-100);
+      outline-offset: 1px;
+    }
+    .icon-btn {
+      width: 48px;
+      height: 48px;
+      border: 2px solid var(--color-text);
+      background: var(--color-white-00);
+      border-radius: 50%;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+    .icon-btn:hover { background: var(--color-yellow-40); }
+    .icon-btn--listening {
+      background: var(--color-red-00);
+      color: var(--color-white-00);
+      border-color: var(--color-red-00);
+      animation: pulse 1.2s ease-in-out infinite;
+    }
+    .icon-btn--active {
+      background: var(--color-teal-00);
+      color: var(--color-white-00);
+      border-color: var(--color-teal-00);
+    }
+    @keyframes pulse {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(164,44,44,0.6); }
+      50% { box-shadow: 0 0 0 8px rgba(164,44,44,0); }
+    }
+    /* Inline body diagram inside a chat bubble */
+    .mini-body {
+      display: block;
+      width: 220px;
+      max-width: 100%;
+      height: auto;
+      margin: 4px auto;
+    }
+    .mini-body .body-fill {
+      fill: #fafafa;
+      stroke: var(--color-mid-grey-00);
+      stroke-width: 1;
+    }
+    .mini-body .region {
+      fill: var(--color-blue-10);
+      stroke: var(--color-blue-100);
+      stroke-width: 1.2;
+      cursor: pointer;
+      transition: fill 0.15s;
+    }
+    .mini-body .region:hover,
+    .mini-body .region:focus-visible {
+      fill: var(--color-yellow-100);
+      outline: none;
+    }
+    .mini-body .region.selected { fill: var(--color-teal-100); }
+
+    /* Three-tier triage panel inside a chat bubble */
+    .tiered { padding: 14px; }
+    .tiered__title { margin: 0 0 4px; font-size: 1.125rem; }
+    .tiered__sub   { margin: 0 0 12px; color: var(--color-mid-grey-00); font-size: 0.9375rem; }
+    .tier { border-radius: 8px; overflow: hidden; margin-bottom: 12px; border: 1px solid var(--color-grey-00); background: var(--color-white-00); }
+    .tier__head {
+      color: var(--color-white-00);
+      padding: 8px 14px;
+      font-weight: 700;
+      font-size: 0.9375rem;
+      text-transform: uppercase;
+      letter-spacing: 0.02em;
+    }
+    .tier__head::before { content: '\25CF'; margin-right: 8px; opacity: 0.85; }
+    .tier__body { padding: 4px 8px; }
+    .tier__opt {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      padding: 10px 6px;
+      border-bottom: 1px solid var(--color-grey-00);
+      cursor: pointer;
+    }
+    .tier__opt:last-child { border-bottom: 0; }
+    .tier__opt input[type="checkbox"] { margin-top: 4px; transform: scale(1.2); flex-shrink: 0; }
+    .tier__opt span { font-size: 0.9375rem; line-height: 1.4; }
+    .tier--green  .tier__head { background: var(--color-green-00); }
+    .tier--amber  .tier__head { background: var(--color-yellow-00); }
+    .tier--red    .tier__head { background: var(--color-red-00); }
+    .tier__actions { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
+    .tier__actions .govbb-btn { width: 100%; text-align: center; }
+    .send-btn {
+      background: var(--color-teal-00);
+      color: var(--color-white-00);
+      border: none;
+      border-radius: 6px;
+      padding: 0 18px;
+      font-weight: 700;
+      font-size: 1rem;
+      cursor: pointer;
+      font-family: inherit;
+    }
+    .send-btn:hover { background: #0a4a4e; }
+    .voice-status {
+      font-size: 0.875rem;
+      color: var(--color-mid-grey-00);
+      padding: 4px var(--spacing-s);
+      min-height: 1.4em;
+    }
+    @media (max-width: 480px) {
+      .chat-shell { height: calc(100vh - 250px); border-radius: 0; border-left: 0; border-right: 0; }
+    }
+  </style>
+</head>
+<body class="govbb-page">
+  <header>
+    <div class="govbb-official-banner">
+      <div class="govbb-container">
+        <div class="govbb-official-banner__inner">
+          <span class="govbb-official-banner__crest">
+            <img class="govbb-official-banner__icon" src="https://cdn.jsdelivr.net/npm/@govtech-bb/styles@1.0.0-alpha.16/dist/assets/images/govbb-creast.svg" alt="">
+          </span>
+          <span class="govbb-official-banner__text"><span>An official website of the Government of Barbados</span></span>
+        </div>
+      </div>
+    </div>
+    <div class="govbb-header">
+      <div class="govbb-container">
+        <div class="govbb-header__inner">
+          <a href="#" aria-label="GovBB home"><img class="govbb-header__logo" src="https://cdn.jsdelivr.net/npm/@govtech-bb/styles@1.0.0-alpha.16/dist/assets/images/govbb-logo.svg" alt="GovBB"></a>
+        </div>
+      </div>
+    </div>
+    <div class="govbb-status-banner govbb-status-banner--alpha">
+      <div class="govbb-container"><p><strong>Alpha</strong> This is a new service. Your <a class="govbb-link" href="#">feedback</a> will help us improve it.</p></div>
+    </div>
+  </header>
+
+  <main class="govbb-container" style="padding-block: var(--spacing-m);">
+    <div class="chat-shell" role="region" aria-label="Health assistant chat">
+      <div class="chat-header">
+        <h1>Health assistant</h1>
+        <p>Tell me how you're feeling. I'll help you find care.</p>
+      </div>
+      <div
+        class="chat-stream"
+        id="chat-stream"
+        role="log"
+        aria-live="polite"
+        aria-label="Conversation"
+      ></div>
+      <div class="voice-status" id="voice-status" aria-live="polite"></div>
+      <form class="composer" id="composer" novalidate>
+        <button type="button" class="icon-btn" id="mic-btn" aria-label="Speak instead of typing" title="Tap to speak">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="9" y="2" width="6" height="12" rx="3"/>
+            <path d="M5 11a7 7 0 0 0 14 0"/>
+            <line x1="12" y1="18" x2="12" y2="22"/>
+            <line x1="8" y1="22" x2="16" y2="22"/>
+          </svg>
+        </button>
+        <button type="button" class="icon-btn" id="tts-btn" aria-pressed="false" aria-label="Voice replies off — tap to enable" title="Voice replies off — tap to enable">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M11 5 6 9H2v6h4l5 4V5z"/>
+            <path d="M15.5 8.5a5 5 0 0 1 0 7"/>
+            <path d="M19 5a9 9 0 0 1 0 14"/>
+          </svg>
+        </button>
+        <label for="msg-input" class="govbb-visually-hidden">Type a message</label>
+        <input id="msg-input" type="text" placeholder="Type how you're feeling…" autocomplete="off">
+        <button type="submit" class="send-btn" id="send-btn">Send</button>
+      </form>
+    </div>
+
+    <p style="text-align: center; margin-top: var(--spacing-m); font-size: 0.9375rem; color: var(--color-mid-grey-00);">
+      <strong>If it's an emergency, call 511 now</strong> or go to QEH Accident and Emergency.
+    </p>
+  </main>
+
+  <footer class="govbb-footer">
+    <div class="govbb-container">
+      <div class="govbb-footer__inner">
+        <nav class="govbb-footer__nav" aria-label="Footer">
+          <a class="govbb-footer__link" href="#">Help</a>
+          <a class="govbb-footer__link" href="#">Privacy</a>
+          <a class="govbb-footer__link" href="#">Cookies</a>
+          <a class="govbb-footer__link" href="#">Accessibility statement</a>
+          <a class="govbb-footer__link" href="#">Contact</a>
+        </nav>
+        <hr class="govbb-footer__divider">
+        <div class="govbb-footer__end">
+          <img class="govbb-footer__coat" src="https://cdn.jsdelivr.net/npm/@govtech-bb/styles@1.0.0-alpha.16/dist/assets/images/govbb-creast.svg" alt="Coat of arms of Barbados">
+          <p class="govbb-footer__copy">© Crown copyright</p>
+        </div>
+      </div>
+    </div>
+  </footer>
+</body>
+</html>

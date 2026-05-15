@@ -133,23 +133,23 @@ const PARISHES = [
 ];
 
 const CATEGORIES = [
-  { key: 'symptoms',  label: 'Symptoms or feeling unwell',
+  { key: 'symptoms',  label: 'Feeling sick or unwell',
     hint: 'Fever, pain, vomiting, diarrhoea, dizziness, weakness or fainting' },
-  { key: 'breathing', label: 'A breathing problem',
+  { key: 'breathing', label: 'Trouble breathing',
     hint: 'Asthma, wheezing, shortness of breath, or breathing that worries you' },
   { key: 'injury',    label: 'An injury, wound or burn',
     hint: 'Cuts, bleeding, sprains, burns, head injury or possible broken bone' },
-  { key: 'chest',     label: 'Chest pain, fainting or stroke signs',
+  { key: 'chest',     label: 'Chest pain or fainting',
     hint: 'Chest pain, palpitations, fainting, face drooping, arm weakness or trouble speaking' },
-  { key: 'allergic',  label: 'An allergic reaction or swelling',
+  { key: 'allergic',  label: 'Allergic reaction or swelling',
     hint: 'Rash, itching, swelling or a reaction after food, medicine or a sting' },
-  { key: 'mental',    label: 'Mental health or how you are feeling',
+  { key: 'mental',    label: 'Mental health or mood',
     hint: 'Anxiety, low mood, panic, severe distress, or a sudden change in how you are coping' },
   { key: 'pregnancy', label: 'A pregnancy concern',
     hint: 'Pain, bleeding, reduced movement, or anything that worries you about the pregnancy' },
-  { key: 'child',     label: 'A baby or child',
+  { key: 'child',     label: 'My baby or child is unwell',
     hint: 'Fever, injury, illness, or a baby that is not feeding or seems unwell' },
-  { key: 'routine',   label: 'Repeat medicine, test results or follow-up',
+  { key: 'routine',   label: 'Repeat medicine or test results',
     hint: 'Getting repeat medicine, checking test results, or following up on a previous visit' },
   { key: 'unsure',    label: 'I am not sure',
     hint: 'Not sure what is wrong or where to go? We can help you decide' },
@@ -157,80 +157,346 @@ const CATEGORIES = [
 
 const CATEGORY_LABELS = Object.fromEntries(CATEGORIES.map(c => [c.key, c.label]));
 
+const BODY_PARTS_LIST = [
+  { key: 'head',    label: 'Head or face' },
+  { key: 'eyes',   label: 'Eyes' },
+  { key: 'ears',   label: 'Ears' },
+  { key: 'throat', label: 'Neck or throat' },
+  { key: 'chest',  label: 'Chest' },
+  { key: 'abdomen', label: 'Belly or stomach' },
+  { key: 'back',   label: 'Back' },
+  { key: 'limbs',  label: 'Arms, hands, legs or feet' },
+  { key: 'skin',   label: 'Skin' },
+  { key: 'urinary', label: 'Bladder, groin or pelvic area' },
+];
+
+const BODY_PART_SYMPTOMS = {
+  head: {
+    label: 'Head or face',
+    tiers: [
+      { level: 2, tone: 'red', heading: 'Emergency — seek help now', symptoms: [
+        'Sudden very bad headache — the worst of your life',
+        'Head injury with confusion, vomiting or passing out',
+        'Seizure or fit (body shaking)',
+        'Stroke signs — face drooping, arm weakness or slurred speech',
+        'Stiff neck with high fever and pain in bright light',
+      ]},
+      { level: 3, tone: 'amber', heading: 'Urgent — should be seen today', symptoms: [
+        'Headache getting worse with fever',
+        'Severe migraine not getting better with medicine',
+        'Head injury — no blackout but headache keeps going',
+      ]},
+      { level: 4, tone: 'teal', heading: 'Polyclinic visit recommended', symptoms: [
+        'Headache lasting more than a day',
+        'Facial pain or swelling',
+        'Jaw pain or toothache spreading to face',
+      ]},
+      { level: 5, tone: 'green', heading: 'Routine visit', symptoms: [
+        'Headaches that keep coming back',
+        'Minor skin or face concern',
+      ]},
+    ],
+  },
+  eyes: {
+    label: 'Eyes',
+    tiers: [
+      { level: 2, tone: 'red', heading: 'Emergency — seek help now', symptoms: [
+        'Sudden loss of sight — all or part of vision gone',
+        'Something stuck in the eye',
+        'Chemical splash in the eye',
+        'Severe eye pain after injury',
+      ]},
+      { level: 3, tone: 'amber', heading: 'Urgent — should be seen today', symptoms: [
+        'Sudden blurred or double vision',
+        'Eye pain with redness and hurts in bright light',
+        'Flashes of light or new spots in vision',
+      ]},
+      { level: 4, tone: 'teal', heading: 'Polyclinic visit recommended', symptoms: [
+        'Red or irritated eye — no pain or sight change',
+        'Sticky or watery fluid from the eye',
+        'Feels like something is in the eye',
+      ]},
+      { level: 5, tone: 'green', heading: 'Routine visit', symptoms: [
+        'Dry or itchy eyes that keep coming back',
+        'Mild eye irritation that keeps coming back',
+      ]},
+    ],
+  },
+  ears: {
+    label: 'Ears',
+    tiers: [
+      { level: 3, tone: 'amber', heading: 'Urgent — should be seen today', symptoms: [
+        'Sudden hearing loss for no clear reason',
+        'Severe ear pain with high fever',
+        'Ear hurt by a knock — bleeding or fluid coming out',
+      ]},
+      { level: 4, tone: 'teal', heading: 'Polyclinic visit recommended', symptoms: [
+        'Ear pain or ache',
+        'Fluid or discharge from the ear',
+        'Ringing in the ears',
+        'Ear feels blocked or full',
+      ]},
+      { level: 5, tone: 'green', heading: 'Routine visit', symptoms: [
+        'Hearing loss getting slowly worse',
+        'Mild earache that comes and goes',
+      ]},
+    ],
+  },
+  throat: {
+    label: 'Neck or throat',
+    tiers: [
+      { level: 2, tone: 'red', heading: 'Emergency — seek help now', symptoms: [
+        'Throat swelling making it hard to breathe or swallow',
+        'Stiff neck with high fever',
+        'Choking or something blocking the airway',
+      ]},
+      { level: 3, tone: 'amber', heading: 'Urgent — should be seen today', symptoms: [
+        'Very sore throat — hard to swallow even saliva',
+        'Neck pain or stiffness after an injury',
+        'Swollen glands in neck with high fever',
+      ]},
+      { level: 4, tone: 'teal', heading: 'Polyclinic visit recommended', symptoms: [
+        'Sore throat with mild trouble swallowing',
+        'Hoarse or croaky voice for over a week',
+        'Swollen glands — no high fever',
+      ]},
+      { level: 5, tone: 'green', heading: 'Routine visit', symptoms: [
+        'Mild sore throat or tickle',
+        'Voice that is always hoarse or croaky',
+      ]},
+    ],
+  },
+  chest: {
+    label: 'Chest',
+    tiers: [
+      { level: 2, tone: 'red', heading: 'Emergency — seek help now', symptoms: [
+        'Chest pain or pressure that will not go away',
+        'Hard to breathe even while sitting still',
+        'Heart racing or fluttering with fainting or near-fainting',
+        'Coughing up or vomiting blood',
+      ]},
+      { level: 3, tone: 'amber', heading: 'Urgent — should be seen today', symptoms: [
+        'Chest pain that changes with breathing or position',
+        'Shortness of breath that started in the last day or two',
+        'Heart beating too fast for no clear reason',
+      ]},
+      { level: 4, tone: 'teal', heading: 'Polyclinic visit recommended', symptoms: [
+        'Mild chest tightness when active or exercising',
+        'Ongoing cough with mild shortness of breath',
+        'Chest wall pain after minor injury',
+      ]},
+      { level: 5, tone: 'green', heading: 'Routine visit', symptoms: [
+        'Cough that keeps coming back',
+        'Chest tightness only during exercise',
+      ]},
+    ],
+  },
+  abdomen: {
+    label: 'Belly or stomach',
+    tiers: [
+      { level: 2, tone: 'red', heading: 'Emergency — seek help now', symptoms: [
+        'Sudden very bad stomach pain',
+        'Throwing up blood or dark material',
+        'Stomach is very hard and painful to touch',
+        'Very bad pain on the lower right side with fever',
+      ]},
+      { level: 3, tone: 'amber', heading: 'Urgent — should be seen today', symptoms: [
+        'Stomach pain that is not getting better',
+        'Blood in poo — bright red or dark and sticky',
+        'Kept vomiting — cannot keep fluids down',
+        'Very dry mouth and no urine for many hours',
+      ]},
+      { level: 4, tone: 'teal', heading: 'Polyclinic visit recommended', symptoms: [
+        'Mild to moderate stomach pain',
+        'Diarrhoea with mild pain',
+        'Ongoing nausea or not feeling hungry',
+        'Constipation lasting several days',
+      ]},
+      { level: 5, tone: 'green', heading: 'Routine visit', symptoms: [
+        'Bloating or mild indigestion',
+        'Mild recurring stomach cramps',
+      ]},
+    ],
+  },
+  back: {
+    label: 'Back',
+    tiers: [
+      { level: 2, tone: 'red', heading: 'Emergency — seek help now', symptoms: [
+        'Back injury with leg weakness, numbness or loss of bladder control',
+        'Very bad back pain after a fall, crash or impact',
+        'Cannot stand or walk after a back injury',
+      ]},
+      { level: 3, tone: 'amber', heading: 'Urgent — should be seen today', symptoms: [
+        'Back pain that spreads down the leg — with numbness or tingling',
+        'Back pain with fever',
+        'Moderate back pain after injury — no weakness',
+      ]},
+      { level: 4, tone: 'teal', heading: 'Polyclinic visit recommended', symptoms: [
+        'Moderate back pain with no injury',
+        'Back pain that stops you doing normal things',
+      ]},
+      { level: 5, tone: 'green', heading: 'Routine visit', symptoms: [
+        'Mild recurring back ache',
+        'Minor muscle stiffness',
+      ]},
+    ],
+  },
+  limbs: {
+    label: 'Arms, hands, legs or feet',
+    tiers: [
+      { level: 2, tone: 'red', heading: 'Emergency — seek help now', symptoms: [
+        'Bleeding that will not stop',
+        'Possible broken bone — bone visible or limb looks bent',
+        'Crush injury or damage to a blood vessel',
+        'Sudden very bad leg pain with coldness or colour change',
+      ]},
+      { level: 3, tone: 'amber', heading: 'Urgent — should be seen today', symptoms: [
+        'Possible broken bone — swollen, bent or cannot put weight on it',
+        'A joint that is out of place (dislocated)',
+        'A deep cut that may need stitches',
+        'Sudden swollen, red, warm leg',
+      ]},
+      { level: 4, tone: 'teal', heading: 'Polyclinic visit recommended', symptoms: [
+        'Sprain or strain — can still put weight on it',
+        'A small cut or wound',
+        'Joint pain or swelling — no injury',
+        'Numbness or tingling in hands or feet',
+      ]},
+      { level: 5, tone: 'green', heading: 'Routine visit', symptoms: [
+        'Minor bruising',
+        'Mild recurring joint or muscle pain',
+        'Ingrown toenail or minor foot issue',
+      ]},
+    ],
+  },
+  skin: {
+    label: 'Skin',
+    tiers: [
+      { level: 2, tone: 'red', heading: 'Emergency — seek help now', symptoms: [
+        'Severe burn — large area or on face, hands or near the airway',
+        'Wide rash with trouble breathing or throat swelling',
+        'Redness and swelling that is spreading fast',
+      ]},
+      { level: 3, tone: 'amber', heading: 'Urgent — should be seen today', symptoms: [
+        'Wound that looks infected — more red, hot and with pus',
+        'Red, swollen skin spreading over hours',
+        'Moderate burn — blistering on a small area',
+      ]},
+      { level: 4, tone: 'teal', heading: 'Polyclinic visit recommended', symptoms: [
+        'Rash with no breathing problem',
+        'Wound with mild redness — possible infection',
+        'Minor burn with blistering',
+        'Hives or allergic skin reaction — no breathing problem',
+      ]},
+      { level: 5, tone: 'green', heading: 'Routine visit', symptoms: [
+        'Ongoing skin condition or rash',
+        'Mild skin irritation or itch',
+        'Acne or minor skin concern',
+      ]},
+    ],
+  },
+  urinary: {
+    label: 'Bladder, groin or pelvic area',
+    tiers: [
+      { level: 2, tone: 'red', heading: 'Emergency — seek help now', symptoms: [
+        'Sudden very bad pain in the groin or testicle',
+        'Cannot pass urine and in bad pain',
+        'Heavy bleeding from the groin or genitals',
+      ]},
+      { level: 3, tone: 'amber', heading: 'Urgent — should be seen today', symptoms: [
+        'Burning when urinating with fever, back pain or shaking',
+        'Blood in urine',
+        'Very bad pelvic pain',
+      ]},
+      { level: 4, tone: 'teal', heading: 'Polyclinic visit recommended', symptoms: [
+        'Burning or pain when passing urine',
+        'Needing to urinate much more than usual',
+        'Unusual discharge',
+        'Mild pelvic pain or pressure',
+      ]},
+      { level: 5, tone: 'green', heading: 'Routine visit', symptoms: [
+        'Mild urinary infection that keeps coming back',
+        'Minor urinary or genital concern',
+      ]},
+    ],
+  },
+};
+
+// Each entry: { label, ctas } where ctas 1-2 = emergency (A&E/511), ctas 3 = urgent today (Fast Track), ctas 4+ = polyclinic
 const WARNING_SIGNS = {
   symptoms: [
-    'Very drowsy or hard to wake.',
-    'Confused or acting very differently.',
-    'The pain is very bad or getting worse quickly.',
-    'Too weak to stand.',
-    'Has not passed urine in a long time, dry mouth, or too weak to drink.',
-    'Getting worse quickly — very weak, confused, or short of breath.',
+    { label: 'Very drowsy or hard to wake', ctas: 2 },
+    { label: 'Confused or acting very differently', ctas: 2 },
+    { label: 'Too weak to stand or move', ctas: 2 },
+    { label: 'Getting worse very fast — very weak, confused or short of breath', ctas: 2 },
+    { label: 'The pain is severe and getting worse quickly', ctas: 3 },
+    { label: 'Not passed urine for many hours — very dry mouth or too weak to drink', ctas: 3 },
   ],
   breathing: [
-    'Struggling to breathe, gasping or choking.',
-    'Lips, tongue or face look blue or grey.',
-    'Cannot speak full sentences.',
-    'Breathing is getting worse quickly.',
-    'Very drowsy, confused or hard to wake.',
+    { label: 'Struggling to breathe, gasping or choking', ctas: 2 },
+    { label: 'Lips, tongue or face look blue or grey', ctas: 2 },
+    { label: 'Cannot speak in full sentences', ctas: 2 },
+    { label: 'Breathing is getting worse quickly', ctas: 2 },
+    { label: 'Very drowsy, confused or hard to wake', ctas: 2 },
   ],
   injury: [
-    'Bleeding will not slow or stop.',
-    'The wound is deep or large.',
-    'The burn is serious or covers a large area.',
-    'A head injury — confused, headache getting worse, or blacked out.',
-    'Confused, drowsy or behaving differently after the injury.',
-    'The injury happened in a serious fall, crash or fight.',
+    { label: 'Bleeding will not slow or stop', ctas: 2 },
+    { label: 'The burn is serious or covers a large area of the body', ctas: 2 },
+    { label: 'Head injury — confused, headache getting worse or blacked out', ctas: 2 },
+    { label: 'Confused or drowsy after the injury', ctas: 2 },
+    { label: 'The wound is deep or may need stitches', ctas: 3 },
+    { label: 'The injury was from a serious fall, crash or fight', ctas: 3 },
   ],
   chest: [
-    'Chest pain, tightness or pressure that will not go away.',
-    'Has fainted or is hard to wake.',
-    'One side of the face is drooping.',
-    'One arm is weak or numb.',
-    'Speech is slurred, confused or hard to understand.',
-    'Suddenly confused or acting very differently.',
+    { label: 'Chest pain, tightness or pressure that will not go away', ctas: 2 },
+    { label: 'Has fainted or is hard to wake', ctas: 2 },
+    { label: 'One side of the face is drooping', ctas: 2 },
+    { label: 'One arm is weak or numb', ctas: 2 },
+    { label: 'Speech is slurred or hard to understand', ctas: 2 },
+    { label: 'Suddenly confused or acting very differently', ctas: 2 },
   ],
   allergic: [
-    'Face, lips, tongue or throat are swelling.',
-    'Trouble breathing.',
-    'Has collapsed or feels faint.',
-    'The reaction is getting worse quickly.',
-    'Confused, very weak or hard to wake.',
+    { label: 'Face, lips, tongue or throat are swelling', ctas: 2 },
+    { label: 'Trouble breathing', ctas: 2 },
+    { label: 'Has collapsed or feels faint', ctas: 2 },
+    { label: 'The reaction is spreading or getting worse quickly', ctas: 2 },
+    { label: 'Confused, very weak or hard to wake', ctas: 2 },
   ],
   mental: [
-    'Has threatened to harm themselves or someone else.',
-    'Has already harmed themselves.',
-    'Very confused, aggressive, or behaving in a way that worries you.',
+    { label: 'Has threatened to harm themselves or someone else', ctas: 2 },
+    { label: 'Has already harmed themselves', ctas: 2 },
+    { label: 'Very confused or aggressive in a way that worries you', ctas: 3 },
   ],
   pregnancy: [
-    'Heavy bleeding.',
-    'Very bad pain in the stomach or lower abdomen.',
-    'The baby has stopped moving or is moving much less than usual.',
-    'Stroke signs — face drooping, arm weakness or trouble speaking.',
-    'Has collapsed or fainted.',
-    'Trouble breathing.',
+    { label: 'Heavy bleeding', ctas: 2 },
+    { label: 'Very bad stomach pain or low belly pain', ctas: 2 },
+    { label: 'Has collapsed or fainted', ctas: 2 },
+    { label: 'Trouble breathing', ctas: 2 },
+    { label: 'Stroke signs — face drooping, arm weakness or trouble speaking', ctas: 2 },
+    { label: 'The baby has stopped moving or is moving much less than usual', ctas: 3 },
   ],
   child: [
-    'Struggling to breathe.',
-    'Lips, tongue or face look blue or grey.',
-    'A seizure or fit — body shakes uncontrollably.',
-    'Very drowsy or hard to wake.',
-    'An injury or bleeding that will not stop.',
-    'A baby under 3 months with a fever.',
-    'Getting much worse quickly.',
+    { label: 'Struggling to breathe', ctas: 2 },
+    { label: 'Lips, tongue or face look blue or grey', ctas: 2 },
+    { label: 'A seizure or fit — body shaking uncontrollably', ctas: 2 },
+    { label: 'Very drowsy or hard to wake', ctas: 2 },
+    { label: 'An injury or bleeding that will not stop', ctas: 2 },
+    { label: 'Getting much worse quickly', ctas: 2 },
+    { label: 'A baby under 3 months with a fever', ctas: 3 },
   ],
   routine: [
-    'You think the medicine is causing a bad reaction (rash, swelling, very unwell).',
-    'Test results suggest something urgent.',
-    'The condition has got much worse since the last visit.',
+    { label: 'Medicine may be causing a bad reaction — rash, swelling or very unwell', ctas: 3 },
+    { label: 'Test results suggest something urgent', ctas: 3 },
+    { label: 'The condition has got much worse since the last visit', ctas: 3 },
   ],
   unsure: [
-    'Struggling to breathe, gasping or choking.',
-    'Chest pain, tightness or pressure that will not go away.',
-    'Stroke signs — face drooping, arm weakness or trouble speaking.',
-    'Bleeding will not slow or stop.',
-    'Blacked out, very drowsy, confused or hard to wake.',
-    'Has threatened to harm themselves or someone else.',
-    'Getting worse quickly.',
+    { label: 'Struggling to breathe, gasping or choking', ctas: 2 },
+    { label: 'Chest pain, tightness or pressure that will not go away', ctas: 2 },
+    { label: 'Stroke signs — face drooping, arm weakness or trouble speaking', ctas: 2 },
+    { label: 'Bleeding that will not slow or stop', ctas: 2 },
+    { label: 'Blacked out, very drowsy, confused or hard to wake', ctas: 2 },
+    { label: 'Has threatened to harm themselves or someone else', ctas: 2 },
+    { label: 'Getting worse very fast', ctas: 2 },
   ],
 };
 
@@ -343,17 +609,17 @@ const TIERED_BREATHING = {
     {
       key: 'home', tone: 'green', heading: 'Can this be managed at home?',
       items: [
-        'Mild wheeze that eases quickly after using a reliever inhaler (2–4 puffs)',
-        'Mild breathlessness after exercise that settles fully at rest',
-        'Slight nasal congestion or blocked nose causing mild breathing discomfort',
+        'Mild wheeze that got better quickly with an inhaler (2–4 puffs)',
+        'Mild breathlessness after exercise that settles when you rest',
+        'Blocked or stuffy nose making it a little hard to breathe',
       ],
     },
     {
       key: 'today', tone: 'amber', heading: 'Needs medical attention today?',
       items: [
-        'Known asthma — inhaler only partially helped after 2–3 puffs',
-        'Persistent wheeze or chest tightness not resolving with rest',
-        'Shortness of breath at rest that started in the last few hours',
+        'Asthma — inhaler only partly helped after 2–3 puffs',
+        'Wheeze or chest tightness that has not gone away with rest',
+        'Shortness of breath while resting — started in the last few hours',
       ],
     },
     {
@@ -362,7 +628,7 @@ const TIERED_BREATHING = {
         'Gasping, choking or cannot breathe normally at all',
         'Lips, tongue or face are blue or grey',
         'Cannot speak in full sentences because of breathlessness',
-        'Breathing getting rapidly worse despite using the inhaler',
+        'Breathing getting worse even after using the inhaler',
       ],
     },
   ],

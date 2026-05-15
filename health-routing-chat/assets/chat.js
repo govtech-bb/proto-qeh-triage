@@ -4,13 +4,12 @@
 // pain-without-location. Three-tier triage panel for breathing.
 
 (function () {
-  var stream, input, micBtn, ttsBtn, sendBtn, form, voiceStatus;
+  var stream, input, micBtn, sendBtn, restartBtn, form, voiceStatus;
   var state = {
     step: 'open',
     category: null,
     parish: null,
     warningsTriggered: false,
-    ttsOn: false,
   };
 
   // Category-only patterns (used for steering the conversation when no warning sign is matched)
@@ -43,8 +42,32 @@
     b.className = 'bubble bubble--' + kind;
     b.innerHTML = html;
     stream.appendChild(b);
-    stream.scrollTop = stream.scrollHeight;
-    if (kind === 'bot') maybeSpeak(b.textContent);
+    if (kind === 'bot' && window.speechSynthesis) {
+      var bubbleText = b.innerText.trim();
+      var readBtn = document.createElement('button');
+      readBtn.type = 'button';
+      readBtn.className = 'bubble-read-btn';
+      readBtn.textContent = 'Read aloud';
+      readBtn.setAttribute('aria-label', 'Read this response aloud');
+      readBtn.addEventListener('click', function () {
+        if (readBtn.textContent === 'Stop') {
+          window.speechSynthesis.cancel();
+          readBtn.textContent = 'Read aloud';
+          readBtn.classList.remove('bubble-read-btn--playing');
+          return;
+        }
+        speakText(bubbleText, readBtn);
+      });
+      var readWrap = document.createElement('div');
+      readWrap.className = 'bubble-read-wrap';
+      readWrap.appendChild(readBtn);
+      b.appendChild(readWrap);
+    }
+    if (kind === 'user') {
+      stream.scrollTop = stream.scrollHeight;
+    } else {
+      b.scrollIntoView({ block: 'start' });
+    }
     return b;
   }
 
@@ -64,7 +87,6 @@
       wrap.appendChild(btn);
     });
     stream.appendChild(wrap);
-    stream.scrollTop = stream.scrollHeight;
     return wrap;
   }
 
@@ -75,8 +97,8 @@
   }
 
   // ── TTS ──────────────────────────────────────────────
-  function maybeSpeak(text) {
-    if (!state.ttsOn || !window.speechSynthesis || !text) return;
+  function speakText(text, btn) {
+    if (!window.speechSynthesis || !text) return;
     var clean = text.replace(/\s+/g, ' ').trim();
     if (!clean) return;
     try { window.speechSynthesis.cancel(); } catch (e) {}
@@ -87,20 +109,13 @@
                  || voices.find(function (v) { return /^en/i.test(v.lang); });
     if (preferred) u.voice = preferred;
     u.rate = 1.0; u.pitch = 1.0;
+    if (btn) {
+      btn.textContent = 'Stop';
+      btn.classList.add('bubble-read-btn--playing');
+      u.onend  = function () { btn.textContent = 'Read aloud'; btn.classList.remove('bubble-read-btn--playing'); };
+      u.onerror = function () { btn.textContent = 'Read aloud'; btn.classList.remove('bubble-read-btn--playing'); };
+    }
     window.speechSynthesis.speak(u);
-  }
-
-  function setTts(on) {
-    state.ttsOn = !!on;
-    if (ttsBtn) {
-      ttsBtn.setAttribute('aria-pressed', state.ttsOn ? 'true' : 'false');
-      ttsBtn.classList.toggle('icon-btn--active', state.ttsOn);
-      ttsBtn.title = state.ttsOn ? 'Voice replies on — tap to mute' : 'Voice replies off — tap to enable';
-      ttsBtn.setAttribute('aria-label', ttsBtn.title);
-    }
-    if (!state.ttsOn && window.speechSynthesis) {
-      try { window.speechSynthesis.cancel(); } catch (e) {}
-    }
   }
 
   // ── Inline body diagram bubble ──────────────────────
@@ -150,70 +165,132 @@
 
   // ── Tiered breathing triage bubble ──────────────────
   function bubbleTieredBreathing(onResolve) {
-    var b = document.createElement('div');
-    b.className = 'bubble bubble--bot tiered';
-    b.style.maxWidth = '100%';
-    var html = '<h3 class="tiered__title"><strong>For breathing difficulty</strong></h3>' +
-               '<p class="tiered__sub">Tick anything that applies right now — then tap an option below.</p>';
-    TIERED_BREATHING.tiers.forEach(function (tier) {
-      html += '<div class="tier tier--' + tier.tone + '">' +
-                '<div class="tier__head">' + tier.heading + '</div>' +
-                '<div class="tier__body">';
-      tier.items.forEach(function (item, i) {
-        var id = 't-' + tier.key + '-' + i;
-        html += '<label class="tier__opt"><input type="checkbox" data-tier="' + tier.key + '" id="' + id + '"><span>' + escapeHtml(item) + '</span></label>';
-      });
-      html += '</div></div>';
-    });
-    html += '<div class="tier__actions">' +
-              '<button class="govbb-btn" type="button" data-action="continue">Continue with my selection</button>' +
-              '<button class="govbb-btn govbb-btn--secondary" type="button" data-action="not-sure">I am not sure — speak to a nurse</button>' +
-              '<button class="govbb-btn govbb-btn--tertiary" type="button" data-action="none">None of these apply</button>' +
-            '</div>';
-    b.innerHTML = html;
-    stream.appendChild(b);
-    stream.scrollTop = stream.scrollHeight;
+    var wrapper = document.createElement('div');
+    wrapper.className = 'symptom-picker';
 
-    b.querySelectorAll('button[data-action]').forEach(function (btn) {
-      btn.addEventListener('click', function () {
-        var action = btn.getAttribute('data-action');
-        if (action === 'continue') {
-          var checked = b.querySelectorAll('input[type="checkbox"]:checked');
-          if (!checked.length) {
-            // No tick: same as 'none' — go to polyclinic flow
-            bubble('user', 'Continue (nothing ticked)');
-            onResolve({ tier: null });
-            return;
-          }
-          // Severity wins: serious > today > home
-          var tiers = Array.from(checked).map(function (c) { return c.getAttribute('data-tier'); });
-          var pick = tiers.indexOf('serious') > -1 ? 'serious'
-                   : tiers.indexOf('today')  > -1 ? 'today'
-                   : 'home';
-          bubble('user', 'I ticked: ' + Array.from(checked).map(function (c) { return c.parentElement.textContent.trim(); }).join('; '));
-          onResolve({ tier: pick });
-        } else if (action === 'not-sure') {
-          bubble('user', 'I am not sure');
-          onResolve({ tier: null, fallback: 'unsure' });
-        } else if (action === 'none') {
-          bubble('user', 'None of these apply');
-          onResolve({ tier: null });
-        }
+    var chipClassMap = { serious: 'chip--symptom-emergency', today: 'chip--symptom-urgent', home: '' };
+
+    TIERED_BREATHING.tiers.forEach(function (tier) {
+      var row = document.createElement('div');
+      row.className = 'chips';
+      tier.items.forEach(function (item) {
+        var btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'chip ' + (chipClassMap[tier.key] || '');
+        btn.textContent = item;
+        (function (tierKey) {
+          btn.addEventListener('click', function () {
+            wrapper.remove();
+            bubble('user', escapeHtml(item));
+            onResolve({ tier: tierKey });
+          });
+        }(tier.key));
+        row.appendChild(btn);
       });
+      wrapper.appendChild(row);
     });
-    return b;
+
+    var actionRow = document.createElement('div');
+    actionRow.className = 'chips';
+
+    var notSureBtn = document.createElement('button');
+    notSureBtn.type = 'button';
+    notSureBtn.className = 'chip';
+    notSureBtn.textContent = 'I am not sure — talk to a nurse';
+    notSureBtn.addEventListener('click', function () {
+      wrapper.remove();
+      bubble('user', 'I am not sure — talk to a nurse');
+      onResolve({ tier: null, fallback: 'unsure' });
+    });
+    actionRow.appendChild(notSureBtn);
+
+    var noneBtn = document.createElement('button');
+    noneBtn.type = 'button';
+    noneBtn.className = 'chip';
+    noneBtn.textContent = 'None of these apply to me';
+    noneBtn.addEventListener('click', function () {
+      wrapper.remove();
+      bubble('user', 'None of these apply to me');
+      onResolve({ tier: null });
+    });
+    actionRow.appendChild(noneBtn);
+    wrapper.appendChild(actionRow);
+
+    stream.appendChild(wrapper);
+    wrapper.scrollIntoView({ block: 'start' });
+    return wrapper;
   }
 
   // ── Conversation flow ────────────────────────────────
   function start() {
     bubble('bot',
-      "Hi. Are you unwell? <br>" +
-      "Tell me what's going on — or pick one below. Tap the mic to speak."
+      "Hello. Tell me how you're feeling, or pick one of the options below and I'll help you find the right place to go."
     );
     var quickPicks = CATEGORIES.map(function (c) {
       return { label: c.label, onPick: function () { gotCategory(c.key); } };
     });
+    quickPicks.push({ label: 'None of these', onPick: function () { goBodyPart(); } });
     chips(quickPicks);
+  }
+
+  function goBodyPart() {
+    state.step = 'bodypart';
+    bubble('bot', "Where in your body do you feel unwell? Pick a part below.");
+    var items = BODY_PARTS_LIST.map(function (p) {
+      return { label: p.label, onPick: function () { goBodySymptoms(p.key); } };
+    });
+    chips(items);
+  }
+
+  function goBodySymptoms(bodyKey) {
+    var part = BODY_PART_SYMPTOMS[bodyKey];
+    if (!part) { goParish(); return; }
+    state.step = 'bodysymptoms';
+    bubble('bot', "For " + part.label.toLowerCase() + " — tap the option that best matches what you are feeling.");
+    bubbleSymptomPicker(part, function (level) {
+      if (level <= 2) {
+        state.category = 'symptoms';
+        goEmergency();
+      } else if (level === 3) {
+        state.category = 'symptoms';
+        state.tier = 'today';
+        goParish('today');
+      } else {
+        state.category = 'symptoms';
+        goParish();
+      }
+    });
+  }
+
+  function bubbleSymptomPicker(part, onPick) {
+    var wrapper = document.createElement('div');
+    wrapper.className = 'symptom-picker';
+
+    var chipClass = { red: 'chip--symptom-emergency', amber: 'chip--symptom-urgent', teal: '', green: 'chip--symptom-routine' };
+
+    part.tiers.forEach(function (tier) {
+      var row = document.createElement('div');
+      row.className = 'chips';
+
+      tier.symptoms.forEach(function (symptom) {
+        var btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'chip ' + (chipClass[tier.tone] || '');
+        btn.textContent = symptom;
+        btn.addEventListener('click', function () {
+          wrapper.remove();
+          bubble('user', escapeHtml(symptom));
+          onPick(tier.level);
+        });
+        row.appendChild(btn);
+      });
+
+      wrapper.appendChild(row);
+    });
+
+    stream.appendChild(wrapper);
+    wrapper.scrollIntoView({ block: 'start' });
+    return wrapper;
   }
 
   function gotCategory(cat) {
@@ -223,7 +300,7 @@
 
     // Special case: breathing → three-tier triage
     if (cat === 'breathing') {
-      bubble('bot', "Got it — breathing. Take a look at the list below and tick anything that applies right now.");
+      bubble('bot', "Got it. Pick the option that best describes your breathing right now.");
       bubbleTieredBreathing(function (res) {
         if (res.fallback === 'unsure') { goCallCentre(); return; }
         if (res.tier === 'serious') { goEmergency(); return; }
@@ -237,44 +314,26 @@
 
     // All other categories: standard list of warning chips
     bubble('bot',
-      "Got it — " + escapeHtml(label.toLowerCase()) + ". " +
-      "Are any of these happening right now? Tap any that apply, or 'None of these' to keep going."
+      "Got it. Are any of these happening right now? Tap any that apply, or 'None of these' to keep going."
     );
     var signs = WARNING_SIGNS[cat] || WARNING_SIGNS.unsure;
     var items = signs.map(function (s) {
-      return { label: s, danger: true, onPick: function () { warningTriggered(); } };
+      return {
+        label: s.label,
+        danger: s.ctas <= 2,
+        onPick: (function (ctas) {
+          return function () {
+            if (ctas <= 2) {
+              goEmergency();
+            } else {
+              state.tier = 'today';
+              goParish('today');
+            }
+          };
+        }(s.ctas)),
+      };
     });
     items.push({ label: 'None of these', onPick: function () { goParish(); } });
-    chips(items);
-  }
-
-  function warningTriggered() { goEmergency(); }
-
-  function goEmergency() {
-    state.warningsTriggered = true;
-    bubble('bot',
-      "<strong>Please get emergency help right away.</strong> " +
-      "Call 511 for an ambulance, or go to QEH Accident and Emergency."
-    );
-    chips([
-      { label: 'Call 511', danger: true, onPick: function () { window.location.href = 'tel:511'; } },
-      { label: 'Show me where to go', onPick: function () { goResult(); } },
-    ]);
-  }
-
-  function goCallCentre() {
-    state.category = 'unsure';
-    bubble('bot', "Best to speak to a nurse. I'll show you the advice line.");
-    setTimeout(function () { goResult(); }, 600);
-  }
-
-  function goParish(tier) {
-    state.step = 'parish';
-    if (tier) state.tier = tier;
-    bubble('bot', "Which parish are you in? This helps me find your closest care.");
-    var items = PARISHES.map(function (p) {
-      return { label: p, onPick: function () { state.parish = p; goResult(); } };
-    });
     chips(items);
   }
 
@@ -284,8 +343,41 @@
     if (state.parish) qs += '&parish=' + encodeURIComponent(state.parish);
     if (state.tier)   qs += '&tier='   + encodeURIComponent(state.tier);
     qs += '&from=chat';
-    bubble('bot', "Right — let me show you where to go.");
+    bubble('bot', "Great — let me show you where to go.");
     setTimeout(function () { window.location.href = 'result.html' + qs; }, 700);
+  }
+
+  function resolveParish(parish) {
+    state.parish = parish;
+    goResult();
+  }
+
+  function goEmergency() {
+    state.warningsTriggered = true;
+    bubble('bot',
+      '<strong>Please get emergency help right away.</strong><br>' +
+      'Call 511 for an ambulance, or go to QEH Accident and Emergency.'
+    );
+    chips([
+      { label: 'Call 511 now', danger: true, onPick: function () { window.location.href = 'tel:511'; } },
+      { label: 'Show me where to go', onPick: function () { goResult(); } },
+    ]);
+  }
+
+  function goCallCentre() {
+    state.category = 'unsure';
+    bubble('bot', "No problem — let me connect you with the nurse advice line.");
+    setTimeout(function () { goResult(); }, 600);
+  }
+
+  function goParish(tier) {
+    state.step = 'parish';
+    if (tier) state.tier = tier;
+    bubble('bot', "Which parish do you live in? I'll find your nearest clinic.");
+    var items = PARISHES.map(function (p) {
+      return { label: p, onPick: function () { resolveParish(p); } };
+    });
+    chips(items);
   }
 
   // ── Free-text handler ───────────────────────────────
@@ -300,13 +392,12 @@
             || text.toLowerCase().indexOf(p.toLowerCase()) !== -1;
       });
       if (match) {
-        state.parish = match;
         bubble('bot', escapeHtml(match) + " — got it.");
-        goResult();
+        resolveParish(match);
       } else {
         bubble('bot', "I didn't catch the parish — please tap one of these:");
         var items = PARISHES.map(function (p) {
-          return { label: p, onPick: function () { state.parish = p; goResult(); } };
+          return { label: p, onPick: function () { resolveParish(p); } };
         });
         chips(items);
       }
@@ -369,6 +460,7 @@
 
   // ── Voice input ──────────────────────────────────────
   function setupVoice() {
+    if (!micBtn) return;
     var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SR) {
       micBtn.disabled = true;
@@ -386,19 +478,17 @@
     micBtn.addEventListener('click', function () {
       if (listening) { rec.stop(); return; }
       try { rec.start(); } catch (e) {}
-      // Auto-enable TTS on first mic use: if you talk to it, it talks back
-      if (!state.ttsOn) setTts(true);
     });
 
     rec.addEventListener('start', function () {
       listening = true;
-      micBtn.classList.add('icon-btn--listening');
+      micBtn.classList.add('text-tool-btn--listening');
       micBtn.setAttribute('aria-label', 'Listening — tap to stop');
       voiceStatus.textContent = 'Listening… speak now.';
     });
     rec.addEventListener('end', function () {
       listening = false;
-      micBtn.classList.remove('icon-btn--listening');
+      micBtn.classList.remove('text-tool-btn--listening');
       micBtn.setAttribute('aria-label', 'Speak instead of typing');
       if (input.value.trim()) {
         voiceStatus.textContent = '';
@@ -416,7 +506,7 @@
     });
     rec.addEventListener('error', function (e) {
       listening = false;
-      micBtn.classList.remove('icon-btn--listening');
+      micBtn.classList.remove('text-tool-btn--listening');
       voiceStatus.textContent =
         e.error === 'not-allowed'
           ? 'Microphone permission needed — please allow it and try again.'
@@ -429,8 +519,8 @@
     stream      = document.getElementById('chat-stream');
     input       = document.getElementById('msg-input');
     micBtn      = document.getElementById('mic-btn');
-    ttsBtn      = document.getElementById('tts-btn');
     sendBtn     = document.getElementById('send-btn');
+    restartBtn  = document.getElementById('restart-btn');
     form        = document.getElementById('composer');
     voiceStatus = document.getElementById('voice-status');
 
@@ -441,23 +531,27 @@
       handleUserText(text);
     });
 
-    if (ttsBtn) {
-      if (!('speechSynthesis' in window)) {
-        ttsBtn.disabled = true;
-        ttsBtn.title = 'Voice replies not supported in this browser';
-        ttsBtn.setAttribute('aria-label', ttsBtn.title);
-        ttsBtn.style.opacity = 0.45;
-      } else {
-        ttsBtn.addEventListener('click', function () { setTts(!state.ttsOn); });
-        // Some browsers populate voices asynchronously
-        if (window.speechSynthesis) {
-          window.speechSynthesis.onvoiceschanged = function () {};
-        }
-      }
+    if (window.speechSynthesis) {
+      window.speechSynthesis.onvoiceschanged = function () {};
+    }
+
+    if (restartBtn) {
+      restartBtn.addEventListener('click', function () {
+        if (window.speechSynthesis) window.speechSynthesis.cancel();
+        stream.innerHTML = '';
+        input.value = '';
+        state.step = 'open';
+        state.category = null;
+        state.parish = null;
+        state.warningsTriggered = false;
+        state.tier = null;
+        start();
+        stream.scrollTop = 0;
+      });
     }
 
     setupVoice();
-    setTts(false);
     start();
+    stream.scrollTop = 0;
   });
 })();
